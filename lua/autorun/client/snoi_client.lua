@@ -10,8 +10,17 @@ Email: tochnonement@gmail.com
 local _R = debug.getregistry()
 
 local colorRed = Color(214, 48, 49)
+local colorHostile = Color(255, 149, 149)
+local colorFriendly = Color(170, 255, 149)
+local colorNeutral = Color(255, 255, 255)
 local nearNPCs = {count = 0}
 local distance = 1024 ^ 2
+
+local D_ERR = 0
+local D_HATE = 1
+local D_FEAR = 2
+local D_LIKE = 3
+local D_NEUTRAL = 4
 
 surface.CreateFont('snoi.font', {
     font = 'Roboto',
@@ -31,10 +40,28 @@ local function drawText(text, x, y, color, alx, aly)
     draw.SimpleText(text, 'snoi.font', x, y, color, alx, aly)
 end
 
+local drawMatGradient do
+    local matGradient = Material('vgui/gradient-u.vtf')
+
+    local SetMaterial = surface.SetMaterial
+    local SetDrawColor = surface.SetDrawColor
+    local DrawTexturedRect = surface.DrawTexturedRect
+
+    function drawMatGradient(x, y, w, h, color)
+        SetMaterial(matGradient)
+        SetDrawColor(color)
+        DrawTexturedRect(x, y, w ,h)
+    end
+end
+
 local function findNPCName(npc)
     local model = npc:GetModel()
+    local npcList = list.Get('NPC')
 
-    for _, data in pairs(list.Get('NPC')) do
+    --[[------------------------------
+    Search by a model
+    --------------------------------]]
+    for _, data in pairs(npcList) do
         if data.Model == model then
             local name = data.Name
             name = name:gsub('%(Friendly%)', '', 1)
@@ -46,33 +73,48 @@ local function findNPCName(npc)
         end
     end
 
+    --[[------------------------------
+    Search by a class
+    --------------------------------]]
+    local npcData = npcList[npc:GetClass()]
+    if npcData then
+        return npcData.Name
+    end
+
     return 'Unknown'
 end
 
 --[[------------------------------
-Receive health updates (the engine updates health on the clientside with large delay)
+Receive health/relationships updates (the engine updates health on the clientside with large delay)
 --------------------------------]]
 local getNPCHealth do
-    local healthEnts = {}
     local ReadUInt = net.ReadUInt
-    local EntIndex = _R.Entity.EntIndex
+    local IsValid = IsValid
+    local Entity = Entity
 
     net.Receive('snoi:UpdateHealth', function()
         local entIndex = ReadUInt(16)
         local hp = ReadUInt(15)
+        local npc = Entity(entIndex)
 
-        healthEnts[entIndex] = hp
+        if IsValid(npc) then
+            npc.snoiHealth = hp
+            npc.snoiLastDamage = CurTime()
+        end
     end)
 
-    hook.Add('EntityRemoved', 'ClearHealthCache', function(ent)
-        local index = ent:EntIndex()
-        if healthEnts[index] then
-            healthEnts[index] = nil
+    net.Receive('snoi:UpdateRelations', function()
+        local entIndex = ReadUInt(16)
+        local relations = ReadUInt(3)
+        local npc = Entity(entIndex)
+
+        if IsValid(npc) then
+            npc.snoiRelations = relations
         end
     end)
 
     function getNPCHealth(npc)
-        return healthEnts[EntIndex(npc)] or npc:Health()
+        return npc.snoiHealth or npc:Health()
     end
 end
 
@@ -138,14 +180,34 @@ do
             return
         end
 
+        if (CurTime() - npc:GetVar('snoiLastDamage', 0)) > .2 then
+            npc.snoiOldHealth = Lerp(RealFrameTime() * 2, npc:GetVar('snoiOldHealth', 0), hpFraction)
+        end
+
+        local color = colorNeutral
+        local relations = npc:GetVar('snoiRelations', 0)
+
+        if relations == D_LIKE then
+            color = colorFriendly
+        elseif relations == D_HATE then
+            color = colorHostile
+        end
+
         Start3D2D(pos, ang, scale)
+            local x, y = -infoWidth * .5, 0
+
             SetDrawColor(0, 0, 0, 200)
-            DrawRect(-infoWidth * .5, 0, infoWidth, infoHeight)
+            DrawRect(x, y, infoWidth, infoHeight)
+
+            SetDrawColor(color_white)
+            DrawRect(x + 2, y + 2, infoWidth * npc.snoiOldHealth - 4, infoHeight - 4)
 
             SetDrawColor(colorRed)
-            DrawRect(-infoWidth * .5 + 2, 2, infoWidth * hpFraction - 4, infoHeight - 4)
+            DrawRect(x + 2, y + 2, infoWidth * hpFraction - 4, infoHeight - 4)
 
-            drawText(npc.snoiName, 0, -40, color_white, 1, 1)
+            drawMatGradient(x + 2, y + 2, infoWidth * hpFraction - 4, infoHeight - 4, Color(0, 0, 0, 100))
+
+            drawText(npc.snoiName, 0, -40, color, 1, 1)
         End3D2D()
     end
 
