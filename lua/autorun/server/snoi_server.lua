@@ -49,7 +49,7 @@ do
         end
     end
 
-    timer.Create('snoi.UpdateState', 1, 0, function()
+    timer.Create('snoi.UpdateState', 2, 0, function()
         for _, ent in ipairs(ents_GetAll()) do
             if IsValid(ent) and ent:IsNPC() then
                 updateRelationsForNPC(ent)
