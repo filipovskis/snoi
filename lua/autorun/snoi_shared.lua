@@ -25,3 +25,11 @@ hook.Add('EntityRemoved', 'snoi.RemoveNPCFromCache', function(ent)
         storage.count = storage.count - 1
     end
 end)
+
+timer.Create('snoi.CleanNullNPCs', 0.5, 0, function()
+    for i, ent in ipairs(storage) do
+        if not IsValid(ent) then
+            table.remove(storage, i)
+        end
+    end
+end)
