@@ -35,7 +35,6 @@ do
     local Send = net.Send
     local IsValid = IsValid
     local player_GetAll = player.GetAll
-    local ents_GetAll = ents.GetAll
     local ipairs = ipairs
 
     local function updateRelationsForNPC(ent)
@@ -62,8 +61,9 @@ do
     end
 
     timer.Create('snoi.UpdateState', 2, 0, function()
-        for _, ent in ipairs(ents_GetAll()) do
-            if IsValid(ent) and (ent:IsNPC() or ent:IsNextBot()) then
+        for i = 1, snoiNPCs.count do
+            local ent = snoiNPCs[i]
+            if IsValid(ent) then
                 updateRelationsForNPC(ent)
             end
         end

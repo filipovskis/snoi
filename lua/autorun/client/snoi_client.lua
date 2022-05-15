@@ -201,7 +201,6 @@ do
 
     local LocalPlayer = LocalPlayer
     local IsValid = IsValid
-    local GetAll = ents.GetAll
     local GetPos = _R.Entity.GetPos
     local GetRenderBounds = _R.Entity.GetRenderBounds
     local DistToSqr = _R.Vector.DistToSqr
@@ -210,6 +209,7 @@ do
     local Dot = _R.Vector.Dot
     local TraceLine = util.TraceLine
     local sort = table.sort
+    local zOffsetVector = Vector(0, 0, 0)
 
     local traceOut = {}
     local traceIn = {
@@ -222,6 +222,7 @@ do
 
     timer.Create('snoi.StoreNearestNPCs', rate, 0, function()
         if not bEnabled then return end
+        if snoiNPCs.count < 1 then return end
 
         local client = LocalPlayer()
         if IsValid(client) then
@@ -230,10 +231,11 @@ do
 
             nearNPCs = {count = 0}
 
-            for _, ent in ipairs(GetAll()) do
-                if ent:IsNPC() or ent:IsNextBot() then
+            for i = 1, snoiNPCs.count do
+                local ent = snoiNPCs[i]
+                if IsValid(ent) then
                     local _, max = GetRenderBounds(ent)
-                    local zOffsetVector = Vector(0, 0, max.z)
+                    zOffsetVector.z = max.z
                     local entpos = GetPos(ent) + zOffsetVector + slightOffset
                     local dist = DistToSqr(pos, entpos)
 
