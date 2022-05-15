@@ -16,14 +16,18 @@ local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
 local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
 
 local colorRed = Color(214, 48, 49)
-local colorHostile = Color(255, 209, 209)
-local colorFriendly = Color(217, 255, 208)
+-- local colorHostile = Color(255, 209, 209)
+-- local colorFriendly = Color(217, 255, 208)
+local colorHostile = Color(255, 4, 4)
+local colorFriendly = Color(119, 255, 88)
 local colorNeutral = Color(255, 255, 255)
 local nearNPCs = {count = 0}
 local distance = cvDistance:GetInt() ^ 2
 local fadeStart = distance * .75
 local slightOffset = Vector(0, 0, 2)
-local font = 'Nunito'
+local fontFamily = 'Nunito'
+
+print('huh?')
 
 cvars.AddChangeCallback('cl_snoi_distance', function()
     distance = cvDistance:GetInt() ^ 2
@@ -38,7 +42,8 @@ local D_LIKE = 3
 local D_NEUTRAL = 4
 
 do
-    local function createFont(name, size)
+    local function createFont(name, size, font)
+        font = font or fontFamily
         surface.CreateFont(name, {
             font = font,
             size = size,
@@ -49,7 +54,7 @@ do
             font = font,
             size = size,
             extended = true,
-            blursize = 2
+            blursize = 3
         })
     end
 
@@ -115,17 +120,19 @@ local drawHealthBar do
     local DrawRect = surface.DrawRect
     local SetDrawColor = surface.SetDrawColor
     local colorShade = Color(0, 0, 0, 150)
+    local ceil = math.ceil
+    local floor = math.floor
 
     function drawHealthBar(x, y, w, h, npc, hpFraction)
         if (CurTime() - npc:GetVar('snoiLastDamage', 0)) > .2 then
             npc.snoiOldHealth = Lerp(RealFrameTime() * 4, npc:GetVar('snoiOldHealth', 0), hpFraction)
         end
 
-        SetDrawColor(0, 0, 0, 100)
+        SetDrawColor(0, 0, 0, 150)
         DrawRect(x, y, w, h)
 
-        local hpLineWidth = math.ceil(w * hpFraction) - 4
-        local whiteLineWidth = math.floor(w * npc.snoiOldHealth) - 4
+        local hpLineWidth = ceil(w * hpFraction) - 4
+        local whiteLineWidth = floor(w * npc.snoiOldHealth) - 4
         local whiteLineWidthActual = whiteLineWidth - hpLineWidth
 
         SetDrawColor(color_white)
@@ -188,6 +195,8 @@ do
     local Dot = _R.Vector.Dot
 
     timer.Create('snoi.StoreNearestNPCs', rate, 0, function()
+        if not cvEnabled:GetBool() then return end
+
         local client = LocalPlayer()
         if IsValid(client) then
             local pos = GetPos(client)
@@ -343,5 +352,22 @@ do
                 end
             end
         end
+    end)
+end
+
+do
+    hook.Add('AddToolMenuCategories', 'snoi.AddToolMenuCategories', function()
+        spawnmenu.AddToolCategory( 'Utilities', 'snoi', 'Simple NPC Overhead Info' )
+    end)
+
+    hook.Add('PopulateToolMenu', 'snoi.PopulateToolMenu', function()
+        spawnmenu.AddToolMenuOption('Utilities', 'snoi', 'snoi_settings', 'Settings', '', '', function(panel)
+            panel:ClearControls()
+
+            panel:CheckBox('Enable overhead info', 'cl_snoi_enabled')
+            panel:CheckBox('Draw NPC names', 'cl_snoi_show_labels')
+            panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
+            panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
+        end)
     end)
 end

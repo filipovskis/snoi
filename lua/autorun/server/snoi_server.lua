@@ -39,20 +39,22 @@ do
     local ipairs = ipairs
 
     local function updateRelationsForNPC(ent)
-        for _, ply in ipairs(player_GetAll()) do
-            if IsValid(ply) then
-                local relations = ent:Disposition(ply)
-                Start('snoi:UpdateRelations')
-                    WriteUInt(ent:EntIndex(), 16)
-                    WriteUInt(relations, 3)
-                Send(ply)
+        if ent.Disposition then
+            for _, ply in ipairs(player_GetAll()) do
+                if IsValid(ply) then
+                    local relations = ent:Disposition(ply)
+                    Start('snoi:UpdateRelations')
+                        WriteUInt(ent:EntIndex(), 16)
+                        WriteUInt(relations, 3)
+                    Send(ply)
+                end
             end
         end
     end
 
     -- Required for DrgBase
     local function delayedUpdateRelations(npc)
-        timer.Create('UpdateRelations_' .. npc:EntIndex(), 0, 1, function()
+        timer.Create('UpdateRelations_' .. npc:EntIndex(), .2, 1, function()
             if IsValid(npc) then
                 updateRelationsForNPC(npc)
             end
@@ -68,7 +70,7 @@ do
     end)
 
     hook.Add('OnEntityCreated', 'snoi.UpdateState', function(ent)
-        if ent:IsNPC() or ent:IsNextBot() then
+        if IsValid(ent) and (ent:IsNPC() or ent:IsNextBot()) then
             delayedUpdateRelations(ent)
         end
     end)
