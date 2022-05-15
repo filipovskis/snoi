@@ -241,7 +241,7 @@ do
 
                     if dist <= distance then
                         local index = nearNPCs.count + 1
-                        local dot = Dot(vec, GetNormalized(entpos - pos))
+                        local dot = Dot(vec, GetNormalized(GetPos(ent) - GetPos(client)))
 
                         ent.snoiName = ent.snoiName or findNPCName(ent)
                         ent.snoiDistance = dist
