@@ -20,7 +20,7 @@ do
     local max = math.max
 
     hook.Add('PostEntityTakeDamage', 'snoi.UpdateHealth', function(ent, dmg, bReceived)
-        if bReceived and ent:IsNPC() then
+        if bReceived and (ent:IsNPC() or ent:IsNextBot()) then
             Start('snoi:UpdateHealth')
                 WriteUInt(ent:EntIndex(), 16)
                 WriteUInt(max(0, ent:Health()), 15)
@@ -41,25 +41,35 @@ do
     local function updateRelationsForNPC(ent)
         for _, ply in ipairs(player_GetAll()) do
             if IsValid(ply) then
+                local relations = ent:Disposition(ply)
                 Start('snoi:UpdateRelations')
                     WriteUInt(ent:EntIndex(), 16)
-                    WriteUInt(ent:Disposition(ply), 3)
+                    WriteUInt(relations, 3)
                 Send(ply)
             end
         end
     end
 
+    -- Required for DrgBase
+    local function delayedUpdateRelations(npc)
+        timer.Create('UpdateRelations_' .. npc:EntIndex(), 0, 1, function()
+            if IsValid(npc) then
+                updateRelationsForNPC(npc)
+            end
+        end)
+    end
+
     timer.Create('snoi.UpdateState', 2, 0, function()
         for _, ent in ipairs(ents_GetAll()) do
-            if IsValid(ent) and ent:IsNPC() then
+            if IsValid(ent) and (ent:IsNPC() or ent:IsNextBot()) then
                 updateRelationsForNPC(ent)
             end
         end
     end)
 
     hook.Add('OnEntityCreated', 'snoi.UpdateState', function(ent)
-        if ent:IsNPC() then
-            updateRelationsForNPC(ent)
+        if ent:IsNPC() or ent:IsNextBot() then
+            delayedUpdateRelations(ent)
         end
     end)
 end

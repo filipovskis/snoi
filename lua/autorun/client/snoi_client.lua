@@ -196,7 +196,7 @@ do
             nearNPCs = {count = 0}
 
             for _, ent in ipairs(GetAll()) do
-                if ent:IsNPC() then
+                if ent:IsNPC() or ent:IsNextBot() then
                     local entpos = GetPos(ent)
                     local dist = DistToSqr(pos, entpos)
                     if dist <= distance then
