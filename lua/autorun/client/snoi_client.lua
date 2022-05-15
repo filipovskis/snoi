@@ -12,16 +12,18 @@ local _R = debug.getregistry()
 local cvEnabled = CreateClientConVar('cl_snoi_enabled', '1')
 local cv3D2D = CreateClientConVar('cl_snoi_3d2d', '0')
 local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 256, 1024)
+local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
+local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
 
 local colorRed = Color(214, 48, 49)
-local colorHostile = Color(255, 149, 149)
-local colorFriendly = Color(170, 255, 149)
+local colorHostile = Color(255, 209, 209)
+local colorFriendly = Color(217, 255, 208)
 local colorNeutral = Color(255, 255, 255)
 local nearNPCs = {count = 0}
 local distance = cvDistance:GetInt() ^ 2
 local fadeStart = distance * .75
 local slightOffset = Vector(0, 0, 2)
-local font = 'Roboto'
+local font = 'Nunito'
 
 cvars.AddChangeCallback('cl_snoi_distance', function()
     distance = cvDistance:GetInt() ^ 2
@@ -35,36 +37,31 @@ local D_FEAR = 2
 local D_LIKE = 3
 local D_NEUTRAL = 4
 
-surface.CreateFont('snoi.3d2dfont', {
-    font = font,
-    size = 40,
-    extended = true
-})
+do
+    local function createFont(name, size)
+        surface.CreateFont(name, {
+            font = font,
+            size = size,
+            extended = true
+        })
 
-surface.CreateFont('snoi.3d2dfont.blur', {
-    font = font,
-    size = 40,
-    extended = true,
-    blursize = 3
-})
+        surface.CreateFont(name .. '.blur', {
+            font = font,
+            size = size,
+            extended = true,
+            blursize = 2
+        })
+    end
 
-surface.CreateFont('snoi.font', {
-    font = font,
-    size = ScreenScale(6),
-    extended = true
-})
-
-surface.CreateFont('snoi.font.blur', {
-    font = font,
-    size = ScreenScale(6),
-    extended = true,
-    blursize = 3
-})
+    createFont('snoi.3d2d.font', 40)
+    createFont('snoi.font', ScreenScale(8))
+    createFont('snoi.smallFont', ScreenScale(6))
+end
 
 local drawText do
     local SimpleText = draw.SimpleText
-    function drawText(text, x, y, color, alx, aly, b3D2D)
-        local font = not b3D2D and 'snoi.font' or 'snoi.3d2dfont'
+    function drawText(text, x, y, color, alx, aly, b3D2D, font)
+        font = font or (not b3D2D and 'snoi.font' or 'snoi.3d2d.font')
         SimpleText(text, font .. '.blur', x, y + 3, color_black, alx, aly)
         SimpleText(text, font, x, y, color, alx, aly)
     end
@@ -117,7 +114,7 @@ end
 local drawHealthBar do
     local DrawRect = surface.DrawRect
     local SetDrawColor = surface.SetDrawColor
-    local colorShade =Color(0, 0, 0, 100)
+    local colorShade = Color(0, 0, 0, 150)
 
     function drawHealthBar(x, y, w, h, npc, hpFraction)
         if (CurTime() - npc:GetVar('snoiLastDamage', 0)) > .2 then
@@ -237,10 +234,12 @@ do
         local pos = realPos:ToScreen()
         local x0, y0 = pos.x, pos.y
 
-        local w, h = ScrW() * .075, ScreenScale(5)
-        local x, y = x0 - w * .5, y0
+        local w, h = ScrW() * .075, math.ceil(ScreenScale(5))
+        local x, y = x0 - w * .5, y0 - h * .5
 
-        local hpFraction = min(1, getNPCHealth(npc) / npc:GetMaxHealth())
+        local hpVal = getNPCHealth(npc)
+        local hpMax = npc:GetMaxHealth()
+        local hpFraction = min(1, hpVal / hpMax)
 
         if hpFraction <= 0 then
             return
@@ -258,10 +257,17 @@ do
             color = colorHostile
         end
 
-        SetAlphaMultiplier(alpha)
-            drawHealthBar(x, y, w, h, npc, hpFraction)
-            drawText(npc.snoiName, x0, y0 - 15, color, 1, 1)
-        SetAlphaMultiplier(1)
+        if alpha > 0 then
+            SetAlphaMultiplier(alpha)
+                drawHealthBar(x, y, w, h, npc, hpFraction)
+                if cvShowHealth:GetBool() then
+                    drawText(hpVal .. '/' .. hpMax, x0, y0, color_white, 1, 1, nil, 'snoi.smallFont')
+                end
+                if cvShowLabel:GetBool() then
+                    drawText(npc.snoiName, x0, y0 - h * 2, color, 1, 1)
+                end
+            SetAlphaMultiplier(1)
+        end
     end
 
     hook.Add('HUDPaint', 'snoi.DrawInfo', function()
