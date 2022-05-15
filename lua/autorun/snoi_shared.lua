@@ -20,9 +20,17 @@ hook.Add('OnEntityCreated', 'snoi.CacheNPC', function(ent)
 end)
 
 hook.Add('EntityRemoved', 'snoi.RemoveNPCFromCache', function(ent)
-    if ent.snoiCacheIndex then
-        table.remove(storage, ent.snoiCacheIndex)
+    local index = ent.snoiCacheIndex
+    if index then
+        table.remove(storage, index)
         storage.count = storage.count - 1
+
+        for i = index, storage.count do
+            local npc = storage[i]
+            if npc then
+                npc.snoiCacheIndex = npc.snoiCacheIndex - 1
+            end
+        end
     end
 end)
 
