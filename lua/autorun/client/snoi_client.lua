@@ -14,7 +14,7 @@ local cv3D2D = CreateClientConVar('cl_snoi_3d2d', '0')
 local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 256, 1024)
 local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
 local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
-local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, nil, 1, 16)
+local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, nil, 1, 10)
 
 local colorRed = Color(214, 48, 49)
 -- local colorHostile = Color(255, 209, 209)
@@ -203,26 +203,40 @@ do
     local IsValid = IsValid
     local GetAll = ents.GetAll
     local GetPos = _R.Entity.GetPos
+    local GetRenderBounds = _R.Entity.GetRenderBounds
     local DistToSqr = _R.Vector.DistToSqr
     local GetNormalized = _R.Vector.GetNormalized
     local GetAimVector = _R.Player.GetAimVector
     local Dot = _R.Vector.Dot
+    local TraceLine = util.TraceLine
     local sort = table.sort
+
+    local traceOut = {}
+    local traceIn = {
+        output = traceOut,
+        filter = true,
+        start = true,
+        endpos = true,
+        mask = MASK_VISIBLE
+    }
 
     timer.Create('snoi.StoreNearestNPCs', rate, 0, function()
         if not bEnabled then return end
 
         local client = LocalPlayer()
         if IsValid(client) then
-            local pos = GetPos(client)
+            local pos = client:EyePos()
             local vec = GetAimVector(client)
 
             nearNPCs = {count = 0}
 
             for _, ent in ipairs(GetAll()) do
                 if ent:IsNPC() or ent:IsNextBot() then
-                    local entpos = GetPos(ent)
+                    local _, max = GetRenderBounds(ent)
+                    local zOffsetVector = Vector(0, 0, max.z)
+                    local entpos = GetPos(ent) + zOffsetVector + slightOffset
                     local dist = DistToSqr(pos, entpos)
+
                     if dist <= distance then
                         local index = nearNPCs.count + 1
                         local dot = Dot(vec, GetNormalized(entpos - pos))
@@ -230,16 +244,26 @@ do
                         ent.snoiName = ent.snoiName or findNPCName(ent)
                         ent.snoiDistance = dist
                         ent.snoiDotProduct = dot
+                        ent.snoiRenderPos = entpos
 
-                        nearNPCs[index] = ent
-                        nearNPCs.count = index
+                        traceIn.filter = client
+                        traceIn.start = pos
+                        traceIn.endpos = entpos
+                        TraceLine(traceIn)
+
+                        if not traceOut.Hit then
+                            nearNPCs[index] = ent
+                            nearNPCs.count = index
+                        end
                     end
                 end
             end
 
-            sort(nearNPCs, function(a, b)
-                return a.snoiDotProduct > b.snoiDotProduct
-            end)
+            if nearNPCs.count > 1 then
+                sort(nearNPCs, function(a, b)
+                    return a.snoiDotProduct > b.snoiDotProduct
+                end)
+            end
         end
     end)
 end
@@ -248,8 +272,6 @@ end
 Disply info (2D)
 --------------------------------]]
 do
-    local GetPos = _R.Entity.GetPos
-    local GetRenderBounds = _R.Entity.GetRenderBounds
     local SetAlphaMultiplier = surface.SetAlphaMultiplier
     local min = math.min
     local ScrW, ScreenScale = ScrW, ScreenScale
@@ -257,10 +279,7 @@ do
     local r, pi = .9, math.pi
 
     local function drawInfo(npc)
-        local _, max = GetRenderBounds(npc)
-        local zOffsetVector = Vector(0, 0, max.z)
-        local realPos = GetPos(npc) + zOffsetVector + slightOffset
-        local pos = realPos:ToScreen()
+        local pos = npc.snoiRenderPos:ToScreen()
         local x0, y0 = pos.x, pos.y
 
         local w, h = ScrW() * .075, ceil(ScreenScale(5))
