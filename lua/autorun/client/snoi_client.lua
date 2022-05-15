@@ -14,6 +14,7 @@ local cv3D2D = CreateClientConVar('cl_snoi_3d2d', '0')
 local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 256, 1024)
 local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
 local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
+local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, nil, 1, 16)
 
 local colorRed = Color(214, 48, 49)
 -- local colorHostile = Color(255, 209, 209)
@@ -27,12 +28,25 @@ local fadeStart = distance * .75
 local slightOffset = Vector(0, 0, 2)
 local fontFamily = 'Nunito'
 
-print('huh?')
-
 cvars.AddChangeCallback('cl_snoi_distance', function()
     distance = cvDistance:GetInt() ^ 2
     fadeStart = distance * .75
 end)
+
+-- Variables connected to convars bc it's faster
+local bEnabled = cvEnabled:GetBool()
+local b3D2D = cv3D2D:GetBool()
+local bShowLabel = true
+local bShowHealth = true
+local iMaxRenders = 3
+
+do
+    cvars.AddChangeCallback('cl_snoi_enabled', function() bEnabled = cvEnabled:GetBool() end)
+    cvars.AddChangeCallback('cl_snoi_3d2d', function() b3D2D = cv3D2D:GetBool() end)
+    cvars.AddChangeCallback('cl_snoi_show_labels', function() bShowLabel = cvShowLabel:GetBool() end)
+    cvars.AddChangeCallback('cl_snoi_show_health', function() bShowHealth = cvShowHealth:GetBool() end)
+    cvars.AddChangeCallback('cl_snoi_max_renders', function() iMaxRenders = cvMaxRenders:GetInt() end)
+end
 
 -- Relationship Enums
 local D_ERR = 0
@@ -66,7 +80,7 @@ end
 local drawText do
     local SimpleText = draw.SimpleText
     function drawText(text, x, y, color, alx, aly, b3D2D, font)
-        font = font or (not b3D2D and 'snoi.font' or 'snoi.3d2d.font')
+        local font = font or (not b3D2D and 'snoi.font' or 'snoi.3d2d.font')
         SimpleText(text, font .. '.blur', x, y + 3, color_black, alx, aly)
         SimpleText(text, font, x, y, color, alx, aly)
     end
@@ -193,9 +207,10 @@ do
     local GetNormalized = _R.Vector.GetNormalized
     local GetAimVector = _R.Player.GetAimVector
     local Dot = _R.Vector.Dot
+    local sort = table.sort
 
     timer.Create('snoi.StoreNearestNPCs', rate, 0, function()
-        if not cvEnabled:GetBool() then return end
+        if not bEnabled then return end
 
         local client = LocalPlayer()
         if IsValid(client) then
@@ -221,6 +236,10 @@ do
                     end
                 end
             end
+
+            sort(nearNPCs, function(a, b)
+                return a.snoiDotProduct > b.snoiDotProduct
+            end)
         end
     end)
 end
@@ -234,7 +253,8 @@ do
     local SetAlphaMultiplier = surface.SetAlphaMultiplier
     local min = math.min
     local ScrW, ScreenScale = ScrW, ScreenScale
-    local r, pi = .85, math.pi
+    local ceil = math.ceil
+    local r, pi = .9, math.pi
 
     local function drawInfo(npc)
         local _, max = GetRenderBounds(npc)
@@ -243,7 +263,7 @@ do
         local pos = realPos:ToScreen()
         local x0, y0 = pos.x, pos.y
 
-        local w, h = ScrW() * .075, math.ceil(ScreenScale(5))
+        local w, h = ScrW() * .075, ceil(ScreenScale(5))
         local x, y = x0 - w * .5, y0 - h * .5
 
         local hpVal = getNPCHealth(npc)
@@ -269,10 +289,10 @@ do
         if alpha > 0 then
             SetAlphaMultiplier(alpha)
                 drawHealthBar(x, y, w, h, npc, hpFraction)
-                if cvShowHealth:GetBool() then
+                if bShowHealth then
                     drawText(hpVal .. '/' .. hpMax, x0, y0, color_white, 1, 1, nil, 'snoi.smallFont')
                 end
-                if cvShowLabel:GetBool() then
+                if bShowLabel then
                     drawText(npc.snoiName, x0, y0 - h * 2, color, 1, 1)
                 end
             SetAlphaMultiplier(1)
@@ -280,9 +300,10 @@ do
     end
 
     hook.Add('HUDPaint', 'snoi.DrawInfo', function()
-        if not cvEnabled:GetBool() then return end
-        if not cv3D2D:GetBool() then
-            for i = 1, nearNPCs.count do
+        if not bEnabled then return end
+        if not b3D2D then
+            local count = min(nearNPCs.count, iMaxRenders)
+            for i = 1, count do
                 local npc = nearNPCs[i]
                 if IsValid(npc) then
                     drawInfo(npc)
@@ -320,10 +341,6 @@ do
             return
         end
 
-        if (CurTime() - npc:GetVar('snoiLastDamage', 0)) > .2 then
-            npc.snoiOldHealth = Lerp(RealFrameTime() * 4, npc:GetVar('snoiOldHealth', 0), hpFraction)
-        end
-
         local color = colorNeutral
         local relations = npc:GetVar('snoiRelations', 0)
 
@@ -342,10 +359,11 @@ do
     end
 
     hook.Add('PostDrawTranslucentRenderables', 'snoi.RenderInfo', function()
-        if not cvEnabled:GetBool() then return end
-        if cv3D2D:GetBool() then
+        if not bEnabled then return end
+        if b3D2D then
             angle.y = EyeAngles().y - 90
-            for i = 1, nearNPCs.count do
+            local count = min(nearNPCs.count, iMaxRenders)
+            for i = 1, count do
                 local npc = nearNPCs[i]
                 if IsValid(npc) then
                     renderInfo(npc)
@@ -368,6 +386,7 @@ do
             panel:CheckBox('Draw NPC names', 'cl_snoi_show_labels')
             panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
             panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
+            panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
         end)
     end)
 end
