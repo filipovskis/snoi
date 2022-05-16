@@ -15,6 +15,7 @@ local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 
 local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
 local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
 local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, nil, 1, 10)
+local cvNPCMaxHeight = CreateClientConVar('cl_snoi_npc_height_limit', '256', nil, nil, nil, 100, 512)
 local cvBarLength = CreateClientConVar('cl_snoi_bar_width', '120', nil, nil, nil, 60, 180)
 local cvBarColorR = CreateClientConVar('cl_snoi_bar_r', '214', nil, nil, nil, 0, 255)
 local cvBarColorG = CreateClientConVar('cl_snoi_bar_g', '48', nil, nil, nil, 0, 255)
@@ -43,6 +44,7 @@ local bShowLabel = cvShowLabel:GetBool()
 local bShowHealth = cvShowHealth:GetBool()
 local iMaxRenders = cvMaxRenders:GetInt()
 local iBarLength = cvBarLength:GetInt()
+local iMaxHeight = cvNPCMaxHeight:GetInt()
 
 do
     local function rebuildColor()
@@ -59,6 +61,7 @@ do
     cvars.AddChangeCallback('cl_snoi_show_health', function() bShowHealth = cvShowHealth:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_max_renders', function() iMaxRenders = cvMaxRenders:GetInt() end)
     cvars.AddChangeCallback('cl_snoi_bar_width', function() iBarLength = cvBarLength:GetInt() end)
+    cvars.AddChangeCallback('cl_snoi_npc_height_limit', function() iMaxHeight = cvNPCMaxHeight:GetInt() end)
 end
 
 -- Relationship Enums
@@ -238,6 +241,7 @@ do
     local TraceLine = util.TraceLine
     local sort = table.sort
     local zOffsetVector = Vector(0, 0, 0)
+    local math_min = math.min
 
     local traceOut = {}
     local traceIn = {
@@ -247,6 +251,12 @@ do
         endpos = true,
         mask = MASK_VISIBLE
     }
+
+    local function getOffset(ent)
+        local _, max = GetRenderBounds(ent)
+        zOffsetVector.z = math_min(max.z, iMaxHeight)
+        return zOffsetVector + slightOffset
+    end
 
     timer.Create('snoi.StoreNearestNPCs', rate, 0, function()
         if not bEnabled then return end
@@ -262,9 +272,7 @@ do
             for i = 1, snoiNPCs.count do
                 local ent = snoiNPCs[i]
                 if IsValid(ent) then
-                    local _, max = GetRenderBounds(ent)
-                    zOffsetVector.z = max.z
-                    local entpos = GetPos(ent) + zOffsetVector + slightOffset
+                    local entpos = GetPos(ent) + getOffset(ent)
                     local dist = DistToSqr(pos, entpos)
 
                     if dist <= distance then
@@ -452,6 +460,7 @@ do
             cvShowHealth:SetInt(cvShowHealth:GetDefault())
             cvMaxRenders:SetInt(cvMaxRenders:GetDefault())
             cvBarLength:SetInt(cvBarLength:GetDefault())
+            cvNPCMaxHeight:SetInt(cvNPCMaxHeight:GetDefault())
         end, 'No', function() end)
     end)
 
@@ -464,6 +473,7 @@ do
             panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
             panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
             panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
+            panel:NumSlider('Max height offset for info', 'cl_snoi_npc_height_limit', cvNPCMaxHeight:GetMin(), cvNPCMaxHeight:GetMax(), 0)
             panel:NumSlider('Health bar width', 'cl_snoi_bar_width', cvBarLength:GetMin(), cvBarLength:GetMax(), 0)
             panel:ColorPicker('Health bar color', 'cl_snoi_bar_r', 'cl_snoi_bar_g', 'cl_snoi_bar_b')
             panel:AddControl('button', {
