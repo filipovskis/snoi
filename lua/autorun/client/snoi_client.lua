@@ -138,15 +138,17 @@ local drawHealthBar do
     local floor = math.floor
 
     function drawHealthBar(x, y, w, h, npc, hpFraction)
+        local snoiOldHealth = npc:GetVar('snoiOldHealth', 0)
+
         if (CurTime() - npc:GetVar('snoiLastDamage', 0)) > .2 then
-            npc.snoiOldHealth = Lerp(RealFrameTime() * 4, npc:GetVar('snoiOldHealth', 0), hpFraction)
+            npc.snoiOldHealth = Lerp(RealFrameTime() * 4, snoiOldHealth, hpFraction)
         end
 
         SetDrawColor(0, 0, 0, 150)
         DrawRect(x, y, w, h)
 
         local hpLineWidth = ceil(w * hpFraction) - 4
-        local whiteLineWidth = floor(w * npc.snoiOldHealth) - 4
+        local whiteLineWidth = floor(w * snoiOldHealth) - 4
         local whiteLineWidthActual = whiteLineWidth - hpLineWidth
 
         SetDrawColor(color_white)
