@@ -7,8 +7,20 @@ Email: tochnonement@gmail.com
 
 --]]
 
+util.AddNetworkString('snoi:SetDead')
 util.AddNetworkString('snoi:UpdateHealth')
 util.AddNetworkString('snoi:UpdateRelations')
+
+local _R = debug.getregistry()
+
+local SendPVSWhereEnt do
+    local GetPos = _R.Entity.GetPos
+    local SendPVS = net.SendPVS
+
+    function SendPVSWhereEnt(ent)
+        SendPVS(GetPos(ent))
+    end
+end
 
 --[[------------------------------
 Send health updates (the engine updates health on the clientside with large delay)
@@ -16,7 +28,6 @@ Send health updates (the engine updates health on the clientside with large dela
 do
     local Start = net.Start
     local WriteUInt = net.WriteUInt
-    local Broadcast = net.Broadcast
     local max = math.max
 
     hook.Add('PostEntityTakeDamage', 'snoi.UpdateHealth', function(ent, dmg, bReceived)
@@ -24,7 +35,23 @@ do
             Start('snoi:UpdateHealth')
                 WriteUInt(ent:EntIndex(), 16)
                 WriteUInt(max(0, ent:Health()), 15)
-            Broadcast()
+            SendPVSWhereEnt(ent)
+        end
+    end)
+end
+
+--[[------------------------------
+Mark NCPS as dead asap
+--------------------------------]]
+do
+    local Start = net.Start
+    local WriteUInt = net.WriteUInt
+
+    hook.Add('OnNPCKilled', 'snoi.MarkAsDead', function(ent)
+        if IsValid(ent) then
+            Start('snoi:SetDead')
+                WriteUInt(ent:EntIndex(), 16)
+            SendPVSWhereEnt(ent)
         end
     end)
 end

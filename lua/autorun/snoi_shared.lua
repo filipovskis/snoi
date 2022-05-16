@@ -41,6 +41,7 @@ timer.Create('snoi.CleanNullNPCs', 0.5, 0, function()
         end
     end
     if bChanges then
+        print('snoi cleaned invalid npcs')
         storage.count = #storage
     end
 end)

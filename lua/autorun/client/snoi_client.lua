@@ -15,10 +15,13 @@ local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 
 local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
 local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
 local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, nil, 1, 10)
+local cvBarLength = CreateClientConVar('cl_snoi_bar_width', '120', nil, nil, nil, 60, 180)
+local cvBarColorR = CreateClientConVar('cl_snoi_bar_r', '214', nil, nil, nil, 0, 255)
+local cvBarColorG = CreateClientConVar('cl_snoi_bar_g', '48', nil, nil, nil, 0, 255)
+local cvBarColorB = CreateClientConVar('cl_snoi_bar_b', '49', nil, nil, nil, 0, 255)
 
-local colorRed = Color(214, 48, 49)
--- local colorHostile = Color(255, 209, 209)
--- local colorFriendly = Color(217, 255, 208)
+local colorHealth = Color(214, 48, 49)
+local colorRed = Color(colorHealth.r, colorHealth.g, colorHealth.b)
 local colorHostile = Color(255, 4, 4)
 local colorFriendly = Color(119, 255, 88)
 local colorNeutral = Color(255, 255, 255)
@@ -36,16 +39,26 @@ end)
 -- Variables connected to convars bc it's faster
 local bEnabled = cvEnabled:GetBool()
 local b3D2D = cv3D2D:GetBool()
-local bShowLabel = true
-local bShowHealth = true
-local iMaxRenders = 3
+local bShowLabel = cvShowLabel:GetBool()
+local bShowHealth = cvShowHealth:GetBool()
+local iMaxRenders = cvMaxRenders:GetInt()
+local iBarLength = cvBarLength:GetInt()
 
 do
+    local function rebuildColor()
+        colorRed = Color(cvBarColorR:GetInt(), cvBarColorG:GetInt(), cvBarColorB:GetInt())
+    end
+    rebuildColor()
+    cvars.AddChangeCallback('cl_snoi_bar_r', rebuildColor)
+    cvars.AddChangeCallback('cl_snoi_bar_g', rebuildColor)
+    cvars.AddChangeCallback('cl_snoi_bar_b', rebuildColor)
+
     cvars.AddChangeCallback('cl_snoi_enabled', function() bEnabled = cvEnabled:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_3d2d', function() b3D2D = cv3D2D:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_show_labels', function() bShowLabel = cvShowLabel:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_show_health', function() bShowHealth = cvShowHealth:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_max_renders', function() iMaxRenders = cvMaxRenders:GetInt() end)
+    cvars.AddChangeCallback('cl_snoi_bar_width', function() iBarLength = cvBarLength:GetInt() end)
 end
 
 -- Relationship Enums
@@ -190,6 +203,15 @@ local getNPCHealth do
         end
     end)
 
+    net.Receive('snoi:SetDead', function()
+        local entIndex = ReadUInt(16)
+        local npc = Entity(entIndex)
+
+        if IsValid(npc) then
+            npc.snoiIsDead = true
+        end
+    end)
+
     function getNPCHealth(npc)
         -- engine delay is about 60ms
         if npc.snoiLastDamage and (CurTime() - npc.snoiLastDamage) < .6 then
@@ -286,18 +308,28 @@ do
     local ceil = math.ceil
     local r, pi = .9, math.pi
 
+    local function clamp(iVal, iMin, iMax)
+        if iVal > iMax then
+            return iMax
+        elseif iVal < iMin then
+            return iMin
+        else
+            return iVal
+        end
+    end
+
     local function drawInfo(npc)
         local pos = npc.snoiRenderPos:ToScreen()
         local x0, y0 = pos.x, pos.y
 
-        local w, h = ScrW() * .075, ceil(ScreenScale(5))
+        local w, h = ceil(iBarLength / 1600 * ScrW()), ceil(ScreenScale(5))
         local x, y = x0 - w * .5, y0 - h * .5
 
         local hpVal = getNPCHealth(npc)
         local hpMax = npc:GetMaxHealth()
-        local hpFraction = min(1, hpVal / hpMax)
+        local hpFraction = clamp(hpVal / hpMax, 0, 1)
 
-        if hpFraction <= 0 then
+        if npc.snoiIsDead then
             return
         end
 
@@ -405,6 +437,24 @@ do
         spawnmenu.AddToolCategory( 'Utilities', 'snoi', 'Simple NPC Overhead Info' )
     end)
 
+    concommand.Add('snoi_reset_color', function()
+        cvBarColorR:SetInt(cvBarColorR:GetDefault())
+        cvBarColorG:SetInt(cvBarColorG:GetDefault())
+        cvBarColorB:SetInt(cvBarColorB:GetDefault())
+    end)
+
+    concommand.Add('snoi_reset_settings', function()
+        Derma_Query('Are you sure that you want to reset ALL settings?', 'Settings Reset Confirmation', 'Yes', function()
+            RunConsoleCommand('snoi_reset_color')
+
+            cvDistance:SetInt(cvDistance:GetDefault())
+            cvShowLabel:SetInt(cvShowLabel:GetDefault())
+            cvShowHealth:SetInt(cvShowHealth:GetDefault())
+            cvMaxRenders:SetInt(cvMaxRenders:GetDefault())
+            cvBarLength:SetInt(cvBarLength:GetDefault())
+        end, 'No', function() end)
+    end)
+
     hook.Add('PopulateToolMenu', 'snoi.PopulateToolMenu', function()
         spawnmenu.AddToolMenuOption('Utilities', 'snoi', 'snoi_settings', 'Settings', '', '', function(panel)
             panel:ClearControls()
@@ -414,6 +464,16 @@ do
             panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
             panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
             panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
+            panel:NumSlider('Health bar width', 'cl_snoi_bar_width', cvBarLength:GetMin(), cvBarLength:GetMax(), 0)
+            panel:ColorPicker('Health bar color', 'cl_snoi_bar_r', 'cl_snoi_bar_g', 'cl_snoi_bar_b')
+            panel:AddControl('button', {
+                label = 'Reset All Settings',
+                command = 'snoi_reset_settings'
+            })
+            panel:AddControl('button', {
+                label = 'Reset Color',
+                command = 'snoi_reset_color'
+            })
         end)
     end)
 end
