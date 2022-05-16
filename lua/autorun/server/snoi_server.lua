@@ -29,6 +29,9 @@ do
     end)
 end
 
+--[[------------------------------
+Send relationships
+--------------------------------]]
 do
     local Start = net.Start
     local WriteUInt = net.WriteUInt
@@ -69,8 +72,8 @@ do
         end
     end)
 
-    hook.Add('OnEntityCreated', 'snoi.UpdateState', function(ent)
-        if IsValid(ent) and (ent:IsNPC() or ent:IsNextBot()) then
+    hook.Add('snoi.OnNPCSpawned', 'snoi.UpdateState', function(ent)
+        if IsValid(ent) then
             delayedUpdateRelations(ent)
         end
     end)

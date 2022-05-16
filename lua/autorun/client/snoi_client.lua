@@ -191,7 +191,11 @@ local getNPCHealth do
     end)
 
     function getNPCHealth(npc)
-        return npc.snoiHealth or npc:Health()
+        -- engine delay is about 60ms
+        if npc.snoiLastDamage and (CurTime() - npc.snoiLastDamage) < .6 then
+            return npc:GetVar('snoiHealth', npc:Health())
+        end
+        return npc:Health()
     end
 end
 

@@ -16,6 +16,7 @@ hook.Add('OnEntityCreated', 'snoi.CacheNPC', function(ent)
         storage[index] = ent
         storage.count = index
         ent.snoiNPC = true
+        hook.Run('snoi.OnNPCSpawned', ent)
     end
 end)
 
