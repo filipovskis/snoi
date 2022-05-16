@@ -477,12 +477,12 @@ do
             panel:NumSlider('Health bar width', 'cl_snoi_bar_width', cvBarLength:GetMin(), cvBarLength:GetMax(), 0)
             panel:ColorPicker('Health bar color', 'cl_snoi_bar_r', 'cl_snoi_bar_g', 'cl_snoi_bar_b')
             panel:AddControl('button', {
-                label = 'Reset All Settings',
-                command = 'snoi_reset_settings'
-            })
-            panel:AddControl('button', {
                 label = 'Reset Color',
                 command = 'snoi_reset_color'
+            })
+            panel:AddControl('button', {
+                label = 'Reset All Settings',
+                command = 'snoi_reset_settings'
             })
         end)
     end)
