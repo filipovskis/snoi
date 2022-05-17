@@ -117,6 +117,10 @@ local drawMatGradient do
 end
 
 local function findNPCName(npc)
+    if npc.IsZetaPlayer then
+        return npc:GetNW2String('zeta_name')
+    end
+
     local model = npc:GetModel()
     local npcList = list.Get('NPC')
 
@@ -272,7 +276,8 @@ do
             for i = 1, snoiNPCs.count do
                 local ent = snoiNPCs[i]
                 if IsValid(ent) then
-                    local entpos = GetPos(ent) + getOffset(ent)
+                    local offset = getOffset(ent)
+                    local entpos = GetPos(ent) + offset
                     local dist = DistToSqr(pos, entpos)
 
                     if dist <= distance then
@@ -282,7 +287,7 @@ do
                         ent.snoiName = ent.snoiName or findNPCName(ent)
                         ent.snoiDistance = dist
                         ent.snoiDotProduct = dot
-                        ent.snoiRenderPos = entpos
+                        ent.snoiRenderOffset = offset
 
                         traceIn.filter = client
                         traceIn.start = pos
@@ -314,6 +319,7 @@ do
     local min = math.min
     local ScrW, ScreenScale = ScrW, ScreenScale
     local ceil = math.ceil
+    local GetPos = _R.Entity.GetPos
     local r, pi = .9, math.pi
 
     local function clamp(iVal, iMin, iMax)
@@ -327,7 +333,7 @@ do
     end
 
     local function drawInfo(npc)
-        local pos = npc.snoiRenderPos:ToScreen()
+        local pos = (GetPos(npc) + npc.snoiRenderOffset):ToScreen()
         local x0, y0 = pos.x, pos.y
 
         local w, h = ceil(iBarLength / 1600 * ScrW()), ceil(ScreenScale(5))
