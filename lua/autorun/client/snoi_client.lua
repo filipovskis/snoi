@@ -221,6 +221,9 @@ local getNPCHealth do
 
     function getNPCHealth(npc)
         -- engine delay is about 60ms
+        if npc.IsZetaPlayer then
+            return npc:GetNW2Int('zeta_health', 0)
+        end
         if npc.snoiLastDamage and (CurTime() - npc.snoiLastDamage) < .6 then
             return npc:GetVar('snoiHealth', npc:Health())
         end
