@@ -28,23 +28,25 @@ Send health updates (the engine updates health on the clientside with large dela
 do
     local Start = net.Start
     local WriteUInt = net.WriteUInt
+    local WriteBool = net.WriteBool
     local max = math.max
     local CurTime = CurTime
     local IsValid = IsValid
 
     local convarHealth = CreateConVar('sv_snoi_custom_health_listener', '1', {FCVAR_ARCHIVE, FCVAR_NOTIFY})
 
-    local function updateHealth(ent)
+    local function updateHealth(ent, fromDamage)
         Start('snoi:UpdateHealth')
             WriteUInt(ent:EntIndex(), 16)
             WriteUInt(max(0, ent:Health()), 15)
+            WriteBool(fromDamage)
         SendPVSWhereEnt(ent)
     end
 
     local function loadCustomHealthListener()
         hook.Add('PostEntityTakeDamage', 'snoi.UpdateHealth', function(ent, dmg, bReceived)
             if bReceived and (ent:IsNPC() or ent:IsNextBot()) then
-                updateHealth(ent)
+                updateHealth(ent, true)
                 ent.snoiLastHealthUpdate = CurTime()
             end
         end)

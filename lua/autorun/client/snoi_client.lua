@@ -232,17 +232,21 @@ Receive health/relationships updates (the engine updates health on the clientsid
 --------------------------------]]
 local getNPCHealth do
     local ReadUInt = net.ReadUInt
+    local ReadBool = net.ReadBool
     local IsValid = IsValid
     local Entity = Entity
 
     net.Receive('snoi:UpdateHealth', function()
         local entIndex = ReadUInt(16)
         local hp = ReadUInt(15)
+        local updByDamage = ReadBool()
         local npc = Entity(entIndex)
 
         if IsValid(npc) then
             npc.snoiHealth = hp
-            npc.snoiLastDamage = CurTime()
+            if updByDamage then
+                npc.snoiLastDamage = CurTime()
+            end
         end
     end)
 
