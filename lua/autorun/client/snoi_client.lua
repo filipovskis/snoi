@@ -9,6 +9,16 @@ Email: tochnonement@gmail.com
 
 local _R = debug.getregistry()
 
+local function CreateClientConVarColor(name, color)
+    local tbl = {}
+
+    tbl.r = CreateClientConVar(name .. '_r', tostring(color.r), nil, nil, nil, 0, 255)
+    tbl.g = CreateClientConVar(name .. '_g', tostring(color.g), nil, nil, nil, 0, 255)
+    tbl.b = CreateClientConVar(name .. '_b', tostring(color.b), nil, nil, nil, 0, 255)
+
+    return tbl
+end
+
 local cvEnabled = CreateClientConVar('cl_snoi_enabled', '1')
 local cv3D2D = CreateClientConVar('cl_snoi_3d2d', '0')
 local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 256, 1024)
@@ -17,12 +27,16 @@ local cvShowHealth = CreateClientConVar('cl_snoi_show_health', '1')
 local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, nil, 1, 10)
 local cvNPCMaxHeight = CreateClientConVar('cl_snoi_npc_height_limit', '256', nil, nil, nil, 100, 512)
 local cvBarLength = CreateClientConVar('cl_snoi_bar_width', '120', nil, nil, nil, 60, 180)
-local cvBarColorR = CreateClientConVar('cl_snoi_bar_r', '214', nil, nil, nil, 0, 255)
-local cvBarColorG = CreateClientConVar('cl_snoi_bar_g', '48', nil, nil, nil, 0, 255)
-local cvBarColorB = CreateClientConVar('cl_snoi_bar_b', '49', nil, nil, nil, 0, 255)
+local cvDifferentBarColor = CreateClientConVar('cl_snoi_different_bar_colors', '1')
+
+local convarsHostileColor = CreateClientConVarColor('cl_snoi_bar', Color(214, 48, 49))
+local convarsFriendlyColor = CreateClientConVarColor('cl_snoi_bar_friendly', Color(39, 174, 96))
+local convarsNeutralColor = CreateClientConVarColor('cl_snoi_bar_neutral', Color(149, 165, 166))
 
 local colorHealth = Color(214, 48, 49)
 local colorRed = Color(colorHealth.r, colorHealth.g, colorHealth.b)
+local colorGreen = Color(39, 174, 96)
+local colorSteel = Color(149, 165, 166)
 local colorHostile = Color(255, 4, 4)
 local colorFriendly = Color(119, 255, 88)
 local colorNeutral = Color(255, 255, 255)
@@ -45,15 +59,30 @@ local bShowHealth = cvShowHealth:GetBool()
 local iMaxRenders = cvMaxRenders:GetInt()
 local iBarLength = cvBarLength:GetInt()
 local iMaxHeight = cvNPCMaxHeight:GetInt()
+local bFriendlyBar = cvDifferentBarColor:GetBool()
 
 do
-    local function rebuildColor()
-        colorRed = Color(cvBarColorR:GetInt(), cvBarColorG:GetInt(), cvBarColorB:GetInt())
+    local function convarColor(name, fn)
+        fn()
+        cvars.AddChangeCallback(name .. '_r', fn)
+        cvars.AddChangeCallback(name .. '_g', fn)
+        cvars.AddChangeCallback(name .. '_b', fn)
     end
-    rebuildColor()
-    cvars.AddChangeCallback('cl_snoi_bar_r', rebuildColor)
-    cvars.AddChangeCallback('cl_snoi_bar_g', rebuildColor)
-    cvars.AddChangeCallback('cl_snoi_bar_b', rebuildColor)
+
+    convarColor('cl_snoi_bar', function()
+        local tbl = convarsHostileColor
+        colorRed = Color(tbl.r:GetInt(), tbl.g:GetInt(), tbl.b:GetInt())
+    end)
+
+    convarColor('cl_snoi_bar_friendly', function()
+        local tbl = convarsFriendlyColor
+        colorGreen = Color(tbl.r:GetInt(), tbl.g:GetInt(), tbl.b:GetInt())
+    end)
+
+    convarColor('cl_snoi_bar_neutral', function()
+        local tbl = convarsNeutralColor
+        colorSteel = Color(tbl.r:GetInt(), tbl.g:GetInt(), tbl.b:GetInt())
+    end)
 
     cvars.AddChangeCallback('cl_snoi_enabled', function() bEnabled = cvEnabled:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_3d2d', function() b3D2D = cv3D2D:GetBool() end)
@@ -62,6 +91,7 @@ do
     cvars.AddChangeCallback('cl_snoi_max_renders', function() iMaxRenders = cvMaxRenders:GetInt() end)
     cvars.AddChangeCallback('cl_snoi_bar_width', function() iBarLength = cvBarLength:GetInt() end)
     cvars.AddChangeCallback('cl_snoi_npc_height_limit', function() iMaxHeight = cvNPCMaxHeight:GetInt() end)
+    cvars.AddChangeCallback('cl_snoi_enable_friendly_bar', function() bFriendlyBar = cvDifferentBarColor:GetBool() end)
 end
 
 -- Relationship Enums
@@ -117,10 +147,6 @@ local drawMatGradient do
 end
 
 local function findNPCName(npc)
-    if npc.IsZetaPlayer then
-        return npc:GetNW2String('zeta_name')
-    end
-
     local model = npc:GetModel()
     local npcList = list.Get('NPC')
 
@@ -150,6 +176,15 @@ local function findNPCName(npc)
     return 'Unknown'
 end
 
+local function getNPCName(npc)
+    if npc.IsZetaPlayer then
+        return npc:GetNW2String('zeta_name')
+    else
+        npc.snoiCachedName = npc.snoiCachedName or findNPCName(npc)
+        return npc.snoiCachedName
+    end
+end
+
 local drawHealthBar do
     local DrawRect = surface.DrawRect
     local SetDrawColor = surface.SetDrawColor
@@ -174,7 +209,18 @@ local drawHealthBar do
         SetDrawColor(color_white)
         DrawRect(x + 2 + hpLineWidth, y + 2, whiteLineWidthActual, h - 4)
 
-        SetDrawColor(colorRed)
+        if bFriendlyBar then
+            local relations = npc:GetVar('snoiRelations', 0)
+            if relations == D_LIKE then
+                SetDrawColor(colorGreen)
+            elseif relations == D_HATE then
+                SetDrawColor(colorRed)
+            else
+                SetDrawColor(colorSteel)
+            end
+        else
+            SetDrawColor(colorRed)
+        end
         DrawRect(x + 2, y + 2, hpLineWidth, h - 4)
 
         drawMatGradient(x + 2, y + 2, hpLineWidth, h - 4, colorShade)
@@ -224,10 +270,7 @@ local getNPCHealth do
         if npc.IsZetaPlayer then
             return npc:GetNW2Int('zeta_health', 0)
         end
-        if npc.snoiLastDamage and (CurTime() - npc.snoiLastDamage) < .6 then
-            return npc:GetVar('snoiHealth', npc:Health())
-        end
-        return npc:Health()
+        return npc:GetVar('snoiHealth', npc:Health())
     end
 end
 
@@ -287,7 +330,7 @@ do
                         local index = nearNPCs.count + 1
                         local dot = Dot(vec, GetNormalized(GetPos(ent) - GetPos(client)))
 
-                        ent.snoiName = ent.snoiName or findNPCName(ent)
+                        ent.snoiName = getNPCName(ent)
                         ent.snoiDistance = dist
                         ent.snoiDotProduct = dot
                         ent.snoiRenderOffset = offset
@@ -454,15 +497,18 @@ do
         spawnmenu.AddToolCategory( 'Utilities', 'snoi', 'Simple NPC Overhead Info' )
     end)
 
-    concommand.Add('snoi_reset_color', function()
-        cvBarColorR:SetInt(cvBarColorR:GetDefault())
-        cvBarColorG:SetInt(cvBarColorG:GetDefault())
-        cvBarColorB:SetInt(cvBarColorB:GetDefault())
+    concommand.Add('snoi_reset_colors', function()
+        local convars = {convarsFriendlyColor, convarsHostileColor, convarsNeutralColor}
+        for _, tbl in ipairs(convars) do
+            tbl.r:SetInt(tbl.r:GetDefault())
+            tbl.g:SetInt(tbl.g:GetDefault())
+            tbl.b:SetInt(tbl.b:GetDefault())
+        end
     end)
 
     concommand.Add('snoi_reset_settings', function()
         Derma_Query('Are you sure that you want to reset ALL settings?', 'Settings Reset Confirmation', 'Yes', function()
-            RunConsoleCommand('snoi_reset_color')
+            RunConsoleCommand('snoi_reset_colors')
 
             cvDistance:SetInt(cvDistance:GetDefault())
             cvShowLabel:SetInt(cvShowLabel:GetDefault())
@@ -484,14 +530,21 @@ do
             panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
             panel:NumSlider('Max height offset for info', 'cl_snoi_npc_height_limit', cvNPCMaxHeight:GetMin(), cvNPCMaxHeight:GetMax(), 0)
             panel:NumSlider('Health bar width', 'cl_snoi_bar_width', cvBarLength:GetMin(), cvBarLength:GetMax(), 0)
-            panel:ColorPicker('Health bar color', 'cl_snoi_bar_r', 'cl_snoi_bar_g', 'cl_snoi_bar_b')
-            panel:AddControl('button', {
-                label = 'Reset Color',
-                command = 'snoi_reset_color'
-            })
             panel:AddControl('button', {
                 label = 'Reset All Settings',
                 command = 'snoi_reset_settings'
+            })
+        end)
+
+        spawnmenu.AddToolMenuOption('Utilities', 'snoi', 'snoi_colors', 'Colors', '', '', function(panel)
+            panel:ClearControls()
+
+            panel:ColorPicker('(Neutral) Health bar color', 'cl_snoi_bar_neutral_r', 'cl_snoi_bar_neutral_g', 'cl_snoi_bar_neutral_b')
+            panel:ColorPicker('(Friendly) Health bar color', 'cl_snoi_bar_friendly_r', 'cl_snoi_bar_friendly_g', 'cl_snoi_bar_friendly_b')
+            panel:ColorPicker('(Hostile) Health bar color', 'cl_snoi_bar_r', 'cl_snoi_bar_g', 'cl_snoi_bar_b')
+            panel:AddControl('button', {
+                label = 'Reset Colors',
+                command = 'snoi_reset_colors'
             })
         end)
     end)

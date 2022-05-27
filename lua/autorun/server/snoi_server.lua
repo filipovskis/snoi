@@ -29,13 +29,52 @@ do
     local Start = net.Start
     local WriteUInt = net.WriteUInt
     local max = math.max
+    local CurTime = CurTime
+    local IsValid = IsValid
 
-    hook.Add('PostEntityTakeDamage', 'snoi.UpdateHealth', function(ent, dmg, bReceived)
-        if bReceived and (ent:IsNPC() or ent:IsNextBot()) then
-            Start('snoi:UpdateHealth')
-                WriteUInt(ent:EntIndex(), 16)
-                WriteUInt(max(0, ent:Health()), 15)
-            SendPVSWhereEnt(ent)
+    local convarHealth = CreateConVar('sv_snoi_custom_health_listener', '1', {FCVAR_ARCHIVE, FCVAR_NOTIFY})
+
+    local function updateHealth(ent)
+        Start('snoi:UpdateHealth')
+            WriteUInt(ent:EntIndex(), 16)
+            WriteUInt(max(0, ent:Health()), 15)
+        SendPVSWhereEnt(ent)
+    end
+
+    local function loadCustomHealthListener()
+        hook.Add('PostEntityTakeDamage', 'snoi.UpdateHealth', function(ent, dmg, bReceived)
+            if bReceived and (ent:IsNPC() or ent:IsNextBot()) then
+                updateHealth(ent)
+                ent.snoiLastHealthUpdate = CurTime()
+            end
+        end)
+
+        hook.Add('Tick', 'snoi.UpdateHealth', function()
+            local now = CurTime()
+            for i = 1, snoiNPCs.count do
+                local ent = snoiNPCs[i]
+                if IsValid(ent) and (now - ent:GetVar('snoiLastHealthUpdate', 0)) > .1 then
+                    updateHealth(ent)
+                    ent.snoiLastHealthUpdate = now
+                end
+            end
+        end)
+    end
+
+    local function unloadCustomHealthListener()
+        hook.Remove('PostEntityTakeDamage', 'snoi.UpdateHealth')
+        hook.Remove('Tick', 'snoi.UpdateHealth')
+    end
+
+    if convarHealth:GetBool() then
+        loadCustomHealthListener()
+    end
+
+    cvars.AddChangeCallback('sv_snoi_custom_health_listener', function(_, old, new)
+        if new then
+            loadCustomHealthListener()
+        else
+            unloadCustomHealthListener()
         end
     end)
 end
