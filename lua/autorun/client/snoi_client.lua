@@ -325,7 +325,7 @@ do
 
             for i = 1, snoiNPCs.count do
                 local ent = snoiNPCs[i]
-                if IsValid(ent) then
+                if IsValid(ent) and ent:GetMaxHealth() > 0 then
                     local offset = getOffset(ent)
                     local entpos = GetPos(ent) + offset
                     local dist = DistToSqr(pos, entpos)
