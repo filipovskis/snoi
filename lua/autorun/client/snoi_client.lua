@@ -28,6 +28,7 @@ local cvMaxRenders = CreateClientConVar('cl_snoi_max_renders', '3', nil, nil, ni
 local cvNPCMaxHeight = CreateClientConVar('cl_snoi_npc_height_limit', '256', nil, nil, nil, 100, 512)
 local cvBarLength = CreateClientConVar('cl_snoi_bar_width', '120', nil, nil, nil, 60, 180)
 local cvDifferentBarColor = CreateClientConVar('cl_snoi_different_bar_colors', '1')
+local cvHideInvisible = CreateClientConVar('cl_snoi_hide_invisible', '1')
 
 local convarsHostileColor = CreateClientConVarColor('cl_snoi_bar', Color(214, 48, 49))
 local convarsFriendlyColor = CreateClientConVarColor('cl_snoi_bar_friendly', Color(39, 174, 96))
@@ -60,6 +61,7 @@ local iMaxRenders = cvMaxRenders:GetInt()
 local iBarLength = cvBarLength:GetInt()
 local iMaxHeight = cvNPCMaxHeight:GetInt()
 local bFriendlyBar = cvDifferentBarColor:GetBool()
+local bHideInvisible = cvHideInvisible:GetBool()
 
 do
     local function convarColor(name, fn)
@@ -92,6 +94,7 @@ do
     cvars.AddChangeCallback('cl_snoi_bar_width', function() iBarLength = cvBarLength:GetInt() end)
     cvars.AddChangeCallback('cl_snoi_npc_height_limit', function() iMaxHeight = cvNPCMaxHeight:GetInt() end)
     cvars.AddChangeCallback('cl_snoi_enable_friendly_bar', function() bFriendlyBar = cvDifferentBarColor:GetBool() end)
+    cvars.AddChangeCallback('cl_snoi_hide_invisible', function() bHideInvisible = cvHideInvisible:GetBool() end)
 end
 
 -- Relationship Enums
@@ -326,6 +329,10 @@ do
             for i = 1, snoiNPCs.count do
                 local ent = snoiNPCs[i]
                 if IsValid(ent) and ent:GetMaxHealth() > 0 then
+                    if bHideInvisible and (ent:GetNoDraw() or ent:GetColor().a < 66) then
+                        goto skip
+                    end
+
                     local offset = getOffset(ent)
                     local entpos = GetPos(ent) + offset
                     local dist = DistToSqr(pos, entpos)
@@ -349,6 +356,8 @@ do
                             nearNPCs.count = index
                         end
                     end
+
+                    ::skip::
                 end
             end
 
@@ -520,6 +529,7 @@ do
             cvMaxRenders:SetInt(cvMaxRenders:GetDefault())
             cvBarLength:SetInt(cvBarLength:GetDefault())
             cvNPCMaxHeight:SetInt(cvNPCMaxHeight:GetDefault())
+            cvHideInvisible:SetInt(cvHideInvisible:GetDefault())
         end, 'No', function() end)
     end)
 
@@ -530,6 +540,7 @@ do
             panel:CheckBox('Enable overhead info', 'cl_snoi_enabled')
             panel:CheckBox('Draw NPC names', 'cl_snoi_show_labels')
             panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
+            panel:CheckBox('Hide healthbars above invisible NPCs', 'cl_snoi_hide_invisible')
             panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
             panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
             panel:NumSlider('Max height offset for info', 'cl_snoi_npc_height_limit', cvNPCMaxHeight:GetMin(), cvNPCMaxHeight:GetMax(), 0)
