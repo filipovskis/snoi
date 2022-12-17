@@ -20,6 +20,7 @@ local function CreateClientConVarColor(name, color)
 end
 
 local cvEnabled = CreateClientConVar('cl_snoi_enabled', '1')
+local cvGradientEnabled = CreateClientConVar('cl_snoi_gradient_enabled', '1')
 local cv3D2D = CreateClientConVar('cl_snoi_3d2d', '0')
 local cvDistance = CreateClientConVar('cl_snoi_distance', '512', nil, nil, nil, 256, 1024)
 local cvShowLabel = CreateClientConVar('cl_snoi_show_labels', '1')
@@ -54,6 +55,7 @@ end)
 
 -- Variables connected to convars bc it's faster
 local bEnabled = cvEnabled:GetBool()
+local bGraEnabled = cvGradientEnabled:GetBool()
 local b3D2D = cv3D2D:GetBool()
 local bShowLabel = cvShowLabel:GetBool()
 local bShowHealth = cvShowHealth:GetBool()
@@ -87,6 +89,7 @@ do
     end)
 
     cvars.AddChangeCallback('cl_snoi_enabled', function() bEnabled = cvEnabled:GetBool() end)
+    cvars.AddChangeCallback('cl_snoi_gradient_enabled', function() bGraEnabled = cvGradientEnabled:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_3d2d', function() b3D2D = cv3D2D:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_show_labels', function() bShowLabel = cvShowLabel:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_show_health', function() bShowHealth = cvShowHealth:GetBool() end)
@@ -226,7 +229,7 @@ local drawHealthBar do
         end
         DrawRect(x + 2, y + 2, hpLineWidth, h - 4)
 
-        drawMatGradient(x + 2, y + 2, hpLineWidth, h - 4, colorShade)
+        if not bGraEnabled then return else drawMatGradient(x + 2, y + 2, hpLineWidth, h - 4, colorShade) end
     end
 end
 
@@ -526,6 +529,7 @@ do
             cvDistance:SetInt(cvDistance:GetDefault())
             cvShowLabel:SetInt(cvShowLabel:GetDefault())
             cvShowHealth:SetInt(cvShowHealth:GetDefault())
+            cvGradientEnabled:SetInt(cvGradientEnabled:GetDefault())
             cvMaxRenders:SetInt(cvMaxRenders:GetDefault())
             cvBarLength:SetInt(cvBarLength:GetDefault())
             cvNPCMaxHeight:SetInt(cvNPCMaxHeight:GetDefault())
@@ -540,6 +544,7 @@ do
             panel:CheckBox('Enable overhead info', 'cl_snoi_enabled')
             panel:CheckBox('Draw NPC names', 'cl_snoi_show_labels')
             panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
+            panel:CheckBox('Draw Healthbars Gradient', 'cl_snoi_gradient_enabled')
             panel:CheckBox('Hide healthbars above invisible NPCs', 'cl_snoi_hide_invisible')
             panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
             panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
