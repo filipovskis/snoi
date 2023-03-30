@@ -38,7 +38,7 @@ do
     local function updateHealth(ent, fromDamage)
         Start('snoi:UpdateHealth')
             WriteUInt(ent:EntIndex(), 16)
-            WriteUInt(max(0, ent:Health()), 15)
+            WriteUInt(max(0, ent:Health()), 18) -- lol there are some npcs with really huge amount of hp :\
             WriteBool(fromDamage)
         SendPVSWhereEnt(ent)
     end

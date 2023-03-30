@@ -29,6 +29,7 @@ local cvNPCMaxHeight = CreateClientConVar('cl_snoi_npc_height_limit', '256', nil
 local cvBarLength = CreateClientConVar('cl_snoi_bar_width', '120', nil, nil, nil, 60, 180)
 local cvDifferentBarColor = CreateClientConVar('cl_snoi_different_bar_colors', '1')
 local cvHideInvisible = CreateClientConVar('cl_snoi_hide_invisible', '1')
+local cvShowFakePlayers = CreateClientConVar('cl_show_fake_players', '1')
 
 local convarsHostileColor = CreateClientConVarColor('cl_snoi_bar', Color(214, 48, 49))
 local convarsFriendlyColor = CreateClientConVarColor('cl_snoi_bar_friendly', Color(39, 174, 96))
@@ -62,6 +63,16 @@ local iBarLength = cvBarLength:GetInt()
 local iMaxHeight = cvNPCMaxHeight:GetInt()
 local bFriendlyBar = cvDifferentBarColor:GetBool()
 local bHideInvisible = cvHideInvisible:GetBool()
+local bShowFakePlayers = cvShowFakePlayers:GetBool()
+
+hook.Add('InitPostEntity', 'snoi', function()
+    if (LambdaReloadAddon or ZetaFileWrite) then
+        local colorTag = Color(172, 70, 255)
+        chat.AddText(colorTag, 'SNOI - Simple NPC Overhead Info')
+        chat.AddText(colorTag, '[SNOI]', color_white, ' Supports ZetaPlayers and LambdaPlayers')
+        chat.AddText(colorTag, '[SNOI]', color_white, ' You can disable health bar above fake players')
+    end
+end)
 
 do
     local function convarColor(name, fn)
@@ -95,6 +106,7 @@ do
     cvars.AddChangeCallback('cl_snoi_npc_height_limit', function() iMaxHeight = cvNPCMaxHeight:GetInt() end)
     cvars.AddChangeCallback('cl_snoi_enable_friendly_bar', function() bFriendlyBar = cvDifferentBarColor:GetBool() end)
     cvars.AddChangeCallback('cl_snoi_hide_invisible', function() bHideInvisible = cvHideInvisible:GetBool() end)
+    cvars.AddChangeCallback('cl_show_fake_players', function() bShowFakePlayers = cvShowFakePlayers:GetBool() end)
 end
 
 -- Relationship Enums
@@ -182,6 +194,8 @@ end
 local function getNPCName(npc)
     if npc.IsZetaPlayer then
         return npc:GetNW2String('zeta_name')
+    elseif npc:GetClass() == 'npc_lambdaplayer' then
+        return npc:GetLambdaName()
     else
         npc.snoiCachedName = npc.snoiCachedName or findNPCName(npc)
         return npc.snoiCachedName
@@ -241,7 +255,7 @@ local getNPCHealth do
 
     net.Receive('snoi:UpdateHealth', function()
         local entIndex = ReadUInt(16)
-        local hp = ReadUInt(15)
+        local hp = ReadUInt(18)
         local updByDamage = ReadBool()
         local npc = Entity(entIndex)
 
@@ -438,6 +452,10 @@ do
             for i = 1, count do
                 local npc = nearNPCs[i]
                 if IsValid(npc) then
+                    local isFakePlayer = (npc:GetClass() == 'npc_lambdaplayer' or npc.IsZetaPlayer)
+                    if not bShowFakePlayers and isFakePlayer then
+                        continue
+                    end
                     drawInfo(npc)
                 end
             end
@@ -498,6 +516,11 @@ do
             for i = 1, count do
                 local npc = nearNPCs[i]
                 if IsValid(npc) then
+                    local isFakePlayer = (npc:GetClass() == 'npc_lambdaplayer' or npc.IsZetaPlayer)
+                    if not bShowFakePlayers and isFakePlayer then
+                        continue
+                    end
+                    
                     renderInfo(npc)
                 end
             end
@@ -530,6 +553,7 @@ do
             cvBarLength:SetInt(cvBarLength:GetDefault())
             cvNPCMaxHeight:SetInt(cvNPCMaxHeight:GetDefault())
             cvHideInvisible:SetInt(cvHideInvisible:GetDefault())
+            cvShowFakePlayers:SetInt(cvShowFakePlayers:GetDefault())
         end, 'No', function() end)
     end)
 
@@ -540,6 +564,7 @@ do
             panel:CheckBox('Enable overhead info', 'cl_snoi_enabled')
             panel:CheckBox('Draw NPC names', 'cl_snoi_show_labels')
             panel:CheckBox('Draw NPC health numbers', 'cl_snoi_show_health')
+            panel:CheckBox('Show healthbars above fake players', 'cl_show_fake_players')
             panel:CheckBox('Hide healthbars above invisible NPCs', 'cl_snoi_hide_invisible')
             panel:NumSlider('Render distance', 'cl_snoi_distance', cvDistance:GetMin(), cvDistance:GetMax(), 0)
             panel:NumSlider('Max renders', 'cl_snoi_max_renders', cvMaxRenders:GetMin(), cvMaxRenders:GetMax(), 0)
