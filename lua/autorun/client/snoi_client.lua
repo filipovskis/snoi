@@ -194,7 +194,7 @@ end
 local function getNPCName(npc)
     if npc.IsZetaPlayer then
         return npc:GetNW2String('zeta_name')
-    elseif npc:GetClass() == 'npc_lambdaplayer' then
+    elseif npc.GetLambdaName then
         return npc:GetLambdaName()
     else
         npc.snoiCachedName = npc.snoiCachedName or findNPCName(npc)
